@@ -97,6 +97,7 @@ namespace JWTauthWebAPI
             app.UseHttpsRedirection();
 
             app.UseRouting();
+            app.UseStatusCodePages();
 
             app.UseAuthentication();
 

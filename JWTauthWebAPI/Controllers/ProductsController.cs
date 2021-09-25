@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using JWTauthWebAPI.Data;
 using JWTauthWebAPI.Model;
 using Microsoft.AspNetCore.Authorization;
+using JWTauthWebAPI.Utilities;
 
 namespace JWTauthWebAPI.Controllers
 {
@@ -25,6 +26,7 @@ namespace JWTauthWebAPI.Controllers
 
         // GET: api/Products
         [HttpGet]
+        [Authorize(Roles = Role.Admin)]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
             return await _context.Products.ToListAsync();
@@ -54,7 +56,7 @@ namespace JWTauthWebAPI.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(product).State = EntityState.Modified;
+            var r =_context.Entry(product).State = EntityState.Modified;
 
             try
             {

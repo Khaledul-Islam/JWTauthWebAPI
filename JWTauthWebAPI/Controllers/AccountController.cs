@@ -1,6 +1,7 @@
 ﻿using JWTauthWebAPI.Data;
 using JWTauthWebAPI.Helpers;
 using JWTauthWebAPI.Model;
+using JWTauthWebAPI.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -41,6 +42,10 @@ namespace JWTauthWebAPI.Controllers
                 userAccount.UpdateDate = DateTime.Now;
                 userAccount.Version = 1;
                 userAccount.UserName = userAccount.Email;
+                if(userAccount.Role==null)
+                {
+                    userAccount.Role = Role.User;
+                }
 
                 _db.UserAccounts.Add(userAccount);
                 await _db.SaveChangesAsync();
@@ -72,7 +77,17 @@ namespace JWTauthWebAPI.Controllers
                     {
                         string jwtToken = JwtTokenGenerator.GetJwtToken(user, _configuration);
 
-                        return Ok(jwtToken);
+                        return Ok(new UserAccount
+                        {
+                            UserName=user.UserName,
+                            FirstName = user.FirstName,
+                            LastName=user.LastName,
+                            Email=user.Email,
+                            Password="",
+                            Role=user.Role,
+                            UserAccountId=user.UserAccountId,
+                            Token=jwtToken
+                        });
                     }
                     else
                     {
