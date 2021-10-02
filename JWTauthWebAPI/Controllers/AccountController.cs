@@ -2,6 +2,7 @@
 using JWTauthWebAPI.Helpers;
 using JWTauthWebAPI.Model;
 using JWTauthWebAPI.Utilities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -11,12 +12,14 @@ using OtpNet;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace JWTauthWebAPI.Controllers
 {
     [Route("[controller]/[action]")]
     [ApiController]
+    [Authorize]
     public class AccountController : ControllerBase
     {
         private readonly IEmailSender _emailSender;
@@ -32,6 +35,7 @@ namespace JWTauthWebAPI.Controllers
 
 
         [HttpPost]
+        [AllowAnonymous]
         public async Task<IActionResult> Register(UserAccount userAccount)
         {
             if (userAccount != null && !string.IsNullOrEmpty(userAccount.Email) &&
@@ -62,6 +66,7 @@ namespace JWTauthWebAPI.Controllers
         }
 
         [HttpPost]
+        [AllowAnonymous]
         public async Task<IActionResult> Login(SignInModel signInModel)
         {
             if (signInModel != null && !string.IsNullOrEmpty(signInModel.UserName) && !string.IsNullOrEmpty(signInModel.Password))
@@ -109,15 +114,40 @@ namespace JWTauthWebAPI.Controllers
             }
         }
 
-
         [HttpPost]
+        public async Task<IActionResult> ChangePassword(PasswordChangeModel model)
+        {
+            if(model==null)
+            {
+                return BadRequest("Empty Operation");
+            }
+
+            var data = _db.UserAccounts.Where(a => a.UserAccountId == model.UserID && a.UserName == model.UserName);
+            if (data == null)
+            {
+                return NotFound("Not Found");
+            }
+            var passwordDetails = PasswordProtector.GetHashAndSalt(model.Password);
+            UserAccount userAccount = new UserAccount();
+            userAccount.Password = passwordDetails.HashText;
+            userAccount.PasswordSalt = passwordDetails.SaltText;
+            userAccount.HashIteration = passwordDetails.HashIteration;
+            userAccount.HashLength = passwordDetails.HashLength;
+            userAccount.UpdateDate = DateTime.Now;
+            _db.Update(userAccount);
+            await _db.SaveChangesAsync();
+            return Ok("Password changed successfull");
+
+        }
+        [HttpPost]
+        [AllowAnonymous]
         public async Task<IActionResult> ForgetPassword(RecoverPasswordModel recover)
         {
-            
+
             if (!string.IsNullOrEmpty(recover.OTP))
             {
-                var otpObj = await _db.OTPServices.OrderByDescending(x=>x.ID).FirstOrDefaultAsync(x => x.Email.Equals(recover.Email));
-                if(otpObj==null)
+                var otpObj = await _db.OTPServices.OrderByDescending(x => x.ID).FirstOrDefaultAsync(x => x.Email.Equals(recover.Email));
+                if (otpObj == null)
                 {
                     return BadRequest("Invalid OPT");
                 }
@@ -127,8 +157,8 @@ namespace JWTauthWebAPI.Controllers
                     bool verify = false;
                     DateTime otpTime = otpObj.OTPTime;
                     DateTime Now = DateTime.UtcNow;
-                    var  duration = Now.Subtract(otpTime).TotalSeconds;
-                    if(duration<=300)
+                    var duration = Now.Subtract(otpTime).TotalSeconds;
+                    if (duration <= 300)
                     {
                         verify = true;
                     }
@@ -136,9 +166,9 @@ namespace JWTauthWebAPI.Controllers
                     {
                         verify = false;
                     }
-                    if(verify)
+                    if (verify)
                     {
-                        if (!string.IsNullOrEmpty(recover.Email) &&!string.IsNullOrEmpty(recover.NewPassword))
+                        if (!string.IsNullOrEmpty(recover.Email) && !string.IsNullOrEmpty(recover.NewPassword))
                         {
                             var passwordDetails = PasswordProtector.GetHashAndSalt(recover.NewPassword);
                             UserAccount userAccount = new UserAccount();
@@ -178,8 +208,20 @@ namespace JWTauthWebAPI.Controllers
                         var bytes = Base32Encoding.ToBytes("JBSWY3DPEHPK3PXP");
                         var totp = new Totp(bytes, step: 300);
                         OTP = totp.ComputeTotp(DateTime.UtcNow);
-                        await _emailSender.SendEmailAsync(user.Email, "Password Recover JWT AUTH Project", "Your OTP is :" + OTP + ".OTP will expire after 5 minute.");
-                        OTPService oTPService = new OTPService();
+                        //
+                        System.Text.StringBuilder sb = new();
+                        sb.Append("<h3>MR. " + user.LastName + ",</h3>");
+                        sb.Append("<div>");
+                        sb.Append("<p> We have received a request to reset your JWTAUTH Project password.");
+                        sb.Append("To reset your password please use the mentioned six digit code:</p>");
+                        sb.Append("<h2>" + OTP + "</h2>");
+                        sb.Append("<p>" + "If you did not request a password reset, please ignore this email. OTP will expire in 5 minutes." + "</p><br/>");
+                        sb.Append("<p>" + "Thank you," + "</p>");
+                        sb.Append("<p>" + "JWT Auth Team" + "</p>");
+                        var sbbody = sb.ToString();
+
+                        await _emailSender.SendEmailAsync(user.Email, "Password Recover JWT AUTH Project", sbbody);
+                        OTPService oTPService = new();
                         oTPService.Email = user.Email;
                         oTPService.OTP = OTP;
                         oTPService.UserAccountId = user.UserAccountId;
@@ -191,7 +233,7 @@ namespace JWTauthWebAPI.Controllers
                         {
                             Email = recover.Email,
                             OTP = "Check Your Email :" + user.Email + " . within 5 minutes to verify."
-                        }) ;
+                        });
                     }
                 }
                 else
