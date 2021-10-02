@@ -15,5 +15,6 @@ namespace JWTauthWebAPI.Data
         }
         public virtual DbSet<UserAccount> UserAccounts { get; set; }
         public virtual DbSet<Product> Products { get; set; }
+        public virtual DbSet<OTPService> OTPServices { get; set; }
     }
 }
